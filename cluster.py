@@ -8,6 +8,12 @@ import argparse
 import arrow
 import os.path
 
+# Original array format:
+# channel timestamp adcsum tover
+#
+# Munged array format:
+# channel timestamp adcsum tover pseudochannel time_mm is_fake
+
 def find_time_limits(files):
     """Get the latest minimum and earliest maximum hit time in `files`, ie, the time span that's been read out in all the files"""
     tmin=0
@@ -26,9 +32,9 @@ def munged_hits_for_times_one_file(filename, tmin, tmax):
     tmp=np.load(filename,mmap_mode="c")
     ts=tmp[:,1]
     tselector=np.logical_and(ts>tmin, ts<tmax)
+
     # Select just the collection channels
     chs=tmp[:,0]
-
     coll_inds=chs%2560>=1600
     selector=np.logical_and(coll_inds, tselector)
     chs_coll=chs[selector]
@@ -51,9 +57,13 @@ def munged_hits_for_times_one_file(filename, tmin, tmax):
     coll_hits=np.repeat(coll_hits, tovers, axis=0) # Repeat each hit `tovers` times
     # Add 25 to the time of each subsequent fake hit in a real hit
     hit_diffs=np.hstack([np.arange(0,i*25*fake_hit_factor,25*fake_hit_factor) for i in tovers])
+    is_fake=np.where(hit_diffs==0, 0, 1)
     coll_hits[:,1]+=hit_diffs
 
-    return coll_hits
+    munged=np.zeros((coll_hits.shape[0], 7), dtype=int)
+    munged[:,0:4]=coll_hits
+    munged[:,6]=is_fake
+    return munged
 
 def contiguified_channels(chs):
     """
@@ -76,18 +86,17 @@ def munged_hits_for_times(files, tmin, tmax):
         coll_hits=munged_hits_for_times_one_file(f, tmin, tmax)
         if coll_hits.size==0: continue
         if all_hits is None:
-            all_hits=coll_hits[:,0:2]
+            all_hits=coll_hits
         else:
-            all_hits=np.vstack((all_hits, coll_hits[:,0:2]))
+            all_hits=np.vstack((all_hits, coll_hits))
 
     chs=contiguified_channels(all_hits[:,0])
-    all_hits[:,0]=chs
+    all_hits[:,4]=chs
     # Need to rescale the values so they're in the same units, ie, length. Collection channel pitch is 5mm; drift speed is ~1mm/us
-
-    ts=all_hits[:,1]
-    chs*=5
+    ts=all_hits[:,1].copy()
     ts//=50 # Integer division. Not perfect, but probably good enough
     ts-=np.min(ts) # Make the absolute values a bit nicer
+    all_hits[:,5]=ts
 
     return all_hits
 
@@ -103,7 +112,7 @@ def find_clusters(files, tmin, tmax, plot=False, plot_label=None):
     all_hits=munged_hits_for_times(files, tmin, tmax)
     # This code copied from
     # https://scikit-learn.org/stable/auto_examples/cluster/plot_dbscan.html
-    db = DBSCAN(eps=20, min_samples=5).fit(all_hits)
+    db = DBSCAN(eps=20, min_samples=5).fit(all_hits[:,4:6])
     labels = db.labels_
 
     # Number of clusters in labels, ignoring noise if present.
@@ -120,7 +129,7 @@ def find_clusters(files, tmin, tmax, plot=False, plot_label=None):
         # https://scikit-learn.org/stable/auto_examples/cluster/plot_cluster_comparison.html
 
         fig,ax=plt.subplots()
-        plt.scatter(all_hits[:, 1], all_hits[:, 0], color="black", rasterized=True)
+        plt.scatter(all_hits[:, 5], all_hits[:, 4], color="black", rasterized=True)
         ax.set_xlabel("Time $\\times$ drift velocity (mm)")
         ax.set_ylabel("Pseudo-channel")
         plt.tight_layout()
@@ -135,7 +144,7 @@ def find_clusters(files, tmin, tmax, plot=False, plot_label=None):
         colors = np.append(colors, ["#000000"])
 
         fig2,ax2=plt.subplots()
-        plt.scatter(all_hits[:, 1], all_hits[:, 0], color=colors[labels], rasterized=True)
+        plt.scatter(all_hits[:, 5], all_hits[:, 4], color=colors[labels], rasterized=True)
         ax2.set_xlabel("Time $\\times$ drift velocity (mm)")
         ax2.set_ylabel("Pseudo-channel")
         ax2.set_xlim(ax.get_xlim())
@@ -147,7 +156,7 @@ def find_clusters(files, tmin, tmax, plot=False, plot_label=None):
         # Show just the noise hits
         fig3,ax3=plt.subplots()
         isnoise=labels==-1
-        plt.scatter(all_hits[:,1][isnoise], all_hits[:,0][isnoise], color="black", rasterized=True)
+        plt.scatter(all_hits[:,5][isnoise], all_hits[:,4][isnoise], color="black", rasterized=True)
         ax3.set_xlim(ax.get_xlim())
         ax3.set_ylim(ax.get_ylim())
         ax3.set_xlabel("Time $\\times$ drift velocity (mm)")
