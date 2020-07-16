@@ -7,11 +7,11 @@ def maplink(link):
     j=link%5
     return 5*i+(4-j)
 
-def mapchans(c, minc):
+def mapchans(c, minc, newminc):
     link=(c-minc)//48
     linkind=(c-minc)%48
     mappedlink=maplink(link)
-    return 48*mappedlink+linkind
+    return 48*mappedlink+linkind+newminc+1600
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -20,6 +20,8 @@ if __name__=="__main__":
     parser.add_argument("-r", "--rearrange-channels", action="store_true",
                         help="Remap the channels. Requires --min-ch")
     parser.add_argument("--min-ch", type=int, default=None)
+    parser.add_argument("--max-rows", type=int, default=None,
+                        help="Maximum number of rows to convert from each file")
     
     args=parser.parse_args()
 
@@ -29,8 +31,12 @@ if __name__=="__main__":
         
     for i in args.input:
         print(i)
-        a=np.loadtxt(i, dtype=int, usecols=(1,2,3,4))
+        a=np.loadtxt(i, dtype=int, usecols=(1,2,3,4), max_rows=args.max_rows)
         if args.rearrange_channels:
-            tmp=mapchans(a[:,0], args.min_ch)
+            # Take the min channel and round up to the nearest
+            # multiple of 2560 so that ch%2560 has the right
+            # collection/induction properties
+            newminc=2568*(args.min_ch//2560)+1
+            tmp=mapchans(a[:,0], args.min_ch, newminc)
             a[:,0]=tmp
         np.save(i.replace(".txt", ".npy"), a)
