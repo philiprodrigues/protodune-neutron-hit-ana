@@ -7,7 +7,7 @@ def find_noise_hits(files, tmin, tmax):
     all_hits=cluster.munged_hits_for_times(files, tmin, tmax)
     # This code copied from
     # https://scikit-learn.org/stable/auto_examples/cluster/plot_dbscan.html
-    db = DBSCAN(eps=20, min_samples=5).fit(all_hits)
+    db = DBSCAN(eps=20, min_samples=5).fit(all_hits[:,4:6])
     labels = db.labels_
     return all_hits[labels==-1]
 
