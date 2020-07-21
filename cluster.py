@@ -212,8 +212,8 @@ if __name__=="__main__":
 
     label="-{}".format(args.label) if args.label else ""
     
-    n_clusters_on,  n_cluster_hits_on,  n_noises_on,  taxis_on  = fit_one_set(args.on_files,  args.time_window, args.max_fits, "on")
-    n_clusters_off, n_cluster_hits_off, n_noises_off, taxis_off = fit_one_set(args.off_files, args.time_window, args.max_fits, "off")
+    n_clusters_on,  n_cluster_hits_on,  n_noises_on,  taxis_on  = fit_one_set(args.on_files,  args.time_window, args.max_fits, label+"-on")
+    n_clusters_off, n_cluster_hits_off, n_noises_off, taxis_off = fit_one_set(args.off_files, args.time_window, args.max_fits, label+"-off")
     
     fig,ax=plt.subplots()
     ax.plot(taxis_on, n_clusters_on,   "o-", label="n source on")
