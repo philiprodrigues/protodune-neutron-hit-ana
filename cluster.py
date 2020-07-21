@@ -92,10 +92,13 @@ def munged_hits_for_times(files, tmin, tmax):
 
     chs=contiguified_channels(all_hits[:,0])
     all_hits[:,4]=chs
-    # Need to rescale the values so they're in the same units, ie, length. Collection channel pitch is 5mm; drift speed is ~1mm/us
+    # Need to rescale the values so they're in the same units, ie, length. Collection channel pitch is 5mm; drift speed is ~1.6mm/us
     ts=all_hits[:,1].copy()
     ts//=50 # Integer division. Not perfect, but probably good enough
     ts-=np.min(ts) # Make the absolute values a bit nicer
+    # Drift speed, with more integer division
+    ts*=16
+    ts//=10
     all_hits[:,5]=ts
 
     return all_hits
